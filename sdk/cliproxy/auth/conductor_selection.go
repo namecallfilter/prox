@@ -88,7 +88,7 @@ func (m *Manager) PluginSchedulerWantsAcrossPriorities() bool {
 
 func isBuiltInSelector(selector Selector) bool {
 	switch selector.(type) {
-	case *RoundRobinSelector, *WeightedRoundRobinSelector, *FillFirstSelector:
+	case *RoundRobinSelector, *WeightedRoundRobinSelector, *FillFirstSelector, *SoonestResetSelector:
 		return true
 	default:
 		return false
@@ -2314,7 +2314,8 @@ func (m *Manager) useSchedulerFastPath() bool {
 	if m == nil || m.scheduler == nil {
 		return false
 	}
-	return isBuiltInSelector(m.Selector())
+	selector := m.Selector()
+	return isBuiltInSelector(selector) && selectorStrategy(selector) != schedulerStrategyCustom
 }
 
 func shouldRetrySchedulerPick(err error) bool {
