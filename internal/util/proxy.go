@@ -1,4 +1,4 @@
-// Package util provides utility functions for the CLI Proxy API server.
+// Package util provides utility functions for the prox server.
 // It includes helper functions for proxy configuration, HTTP client setup,
 // log level management, and other common operations used across the application.
 package util

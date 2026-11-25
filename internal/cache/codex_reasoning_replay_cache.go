@@ -148,7 +148,7 @@ func AppendCodexReasoningReplayItemsBestEffort(ctx context.Context, modelName, s
 				var errUnmarshal error
 				existing, errUnmarshal = unmarshalReasoningReplayRawJSONArray(existingRaw)
 				if errUnmarshal != nil {
-					log.Errorf("home kv best-effort codex reasoning replay append failed prefix=cpa:codex:* (please upgrade CLIProxyAPI): %v", errUnmarshal)
+					log.Errorf("home kv best-effort codex reasoning replay append failed prefix=cpa:codex:* (please upgrade prox): %v", errUnmarshal)
 					return false
 				}
 			}
@@ -270,7 +270,7 @@ func GetCodexReasoningReplayItemsRequired(ctx context.Context, modelName, sessio
 		}
 		homeItems, errUnmarshal := unmarshalReasoningReplayRawJSONArray(raw)
 		if errUnmarshal != nil {
-			log.Warnf("codex reasoning replay KV decode failed (please upgrade CLIProxyAPI): %v", errUnmarshal)
+			log.Warnf("codex reasoning replay KV decode failed (please upgrade prox): %v", errUnmarshal)
 			return nil, false, errUnmarshal
 		}
 		if _, errExpire := client.KVExpire(ctx, codexReasoningReplayKVKey(modelName, sessionKey), CodexReasoningReplayCacheTTL); errExpire != nil {

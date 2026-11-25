@@ -500,11 +500,11 @@ func marshalReasoningReplayRawJSONArray(items [][]byte) ([]byte, error) {
 func unmarshalReasoningReplayRawJSONArray(raw []byte) ([][]byte, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || !ojson.ValidBytes(trimmed) {
-		return nil, fmt.Errorf("invalid reasoning replay KV payload (please upgrade CLIProxyAPI to a matching version)")
+		return nil, fmt.Errorf("invalid reasoning replay KV payload (please upgrade prox to a matching version)")
 	}
 	root := util.ParseGJSONBytesNoCopy(trimmed)
 	if !root.IsArray() {
-		return nil, fmt.Errorf("unsupported reasoning replay KV format (please upgrade CLIProxyAPI to a matching version)")
+		return nil, fmt.Errorf("unsupported reasoning replay KV format (please upgrade prox to a matching version)")
 	}
 	elems := root.Array()
 	items := make([][]byte, 0, len(elems))
@@ -515,11 +515,11 @@ func unmarshalReasoningReplayRawJSONArray(raw []byte) ([][]byte, error) {
 		case elem.Type == ojson.String:
 			decoded, errDecode := base64.StdEncoding.DecodeString(elem.String())
 			if errDecode != nil {
-				return nil, fmt.Errorf("invalid legacy base64 reasoning replay item (please upgrade CLIProxyAPI): %w", errDecode)
+				return nil, fmt.Errorf("invalid legacy base64 reasoning replay item (please upgrade prox): %w", errDecode)
 			}
 			items = append(items, decoded)
 		default:
-			return nil, fmt.Errorf("unsupported reasoning replay KV element type (please upgrade CLIProxyAPI to a matching version)")
+			return nil, fmt.Errorf("unsupported reasoning replay KV element type (please upgrade prox to a matching version)")
 		}
 	}
 	return items, nil

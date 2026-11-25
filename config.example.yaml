@@ -128,7 +128,7 @@ management:
   # When enabled, the panel is only downloaded on first access if missing, and never auto-updated afterward.
   # disable-auto-update-panel: false
 
-  # Base URL of remote management API when using TUI client mode (cliproxyapi --tui).
+  # Base URL of remote management API when using TUI client mode (prox --tui).
   # Defaults to http://127.0.0.1:<port> if not set. Can also be set via --management-base-url.
   # base-url: "https://proxy.example.com"
 
@@ -1085,7 +1085,7 @@ upstream:
 # OAuth/file-backed credentials. Token material stays in the credential store.
 oauth:
   # Authentication directory (supports ~ for home directory)
-  auth-dir: "~/.cli-proxy-api"
+  auth-dir: "~/.prox"
 
   # Core auth auto-refresh and manual refresh-all worker pool size (OAuth/file-based auth token refresh).
   # When > 0, overrides the default worker count (16).
@@ -1478,7 +1478,7 @@ plugins:
 #   request-retry: 3                 # now routing.retry.request-retry
 #   debug: false                     # now observability.logs.debug
 #   proxy-url: ""                    # now requests.proxy-url
-#   auth-dir: "~/.cli-proxy-api"     # now oauth.auth-dir
+#   auth-dir: "~/.prox"     # now oauth.auth-dir
 #   codex:                           # now oauth.providers.codex
 #     disable-codex-cloaking: false
 #   codex-api-key:                   # now api-keys.codex groups with keys

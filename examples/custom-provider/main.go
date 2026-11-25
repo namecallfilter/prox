@@ -1,5 +1,5 @@
 // Package main demonstrates how to create a custom AI provider executor
-// and integrate it with the CLI Proxy API server. This example shows how to:
+// and integrate it with the prox server. This example shows how to:
 // - Create a custom executor that implements the Executor interface
 // - Register custom translators for request/response transformation
 // - Integrate the custom provider with the SDK server

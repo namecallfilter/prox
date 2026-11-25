@@ -1,6 +1,6 @@
 # Claude Code with a Codex backend
 
-Claude Code can remain the client while CLIProxyAPI routes its Messages requests
+Claude Code can remain the client while prox routes its Messages requests
 to a Codex credential. Client model names are routing aliases: they do not change
 the upstream model or make the connection an Anthropic subscription session.
 
@@ -65,7 +65,7 @@ for its current classifier-selection rules.
 
 ## Image tools and coding latency
 
-CLIProxyAPI can add the native OpenAI `image_generation` tool automatically.
+prox can add the native OpenAI `image_generation` tool automatically.
 That is separate from any external MCP image tool declared by a client.
 Operators who want the client to own its tool list can use the existing mode:
 

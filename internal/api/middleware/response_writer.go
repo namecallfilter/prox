@@ -1,4 +1,4 @@
-// Package middleware provides Gin HTTP middleware for the CLI Proxy API server.
+// Package middleware provides Gin HTTP middleware for the prox server.
 // It includes a sophisticated response writer wrapper designed to capture and log request and response data,
 // including support for streaming responses, without impacting latency.
 package middleware

@@ -1,4 +1,4 @@
-// Package logging provides request logging functionality for the CLI Proxy API server.
+// Package logging provides request logging functionality for the prox server.
 // It handles capturing and storing detailed HTTP request and response data when enabled
 // through configuration, supporting both regular and streaming responses.
 package logging

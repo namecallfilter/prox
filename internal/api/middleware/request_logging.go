@@ -1,4 +1,4 @@
-// Package middleware provides HTTP middleware components for the CLI Proxy API server.
+// Package middleware provides HTTP middleware components for the prox server.
 // This file contains the request logging middleware that captures comprehensive
 // request and response data when enabled through configuration.
 package middleware

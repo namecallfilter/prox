@@ -1,6 +1,6 @@
 # WebSocket Tunnel Integration Guide
 
-CLIProxyAPI provides a built-in, multi-tenant, many-to-many **WebSocket Tunnel** (`GET /v1/tunnel`) that relays opaque packets between authenticated **Client** and **Server** devices. CLIProxyAPI acts strictly as a zero-inspection packet switch: it enforces `access.api-keys` tenant isolation, tracks online device topology, verifies sender identity headers, and forwards payloads without inspecting or mutating business content.
+prox provides a built-in, multi-tenant, many-to-many **WebSocket Tunnel** (`GET /v1/tunnel`) that relays opaque packets between authenticated **Client** and **Server** devices. prox acts strictly as a zero-inspection packet switch: it enforces `access.api-keys` tenant isolation, tracks online device topology, verifies sender identity headers, and forwards payloads without inspecting or mutating business content.
 
 ---
 
@@ -8,7 +8,7 @@ CLIProxyAPI provides a built-in, multi-tenant, many-to-many **WebSocket Tunnel**
 
 ```text
                 +-----------------------------------------+
-                |       CLIProxyAPI  (GET /v1/tunnel)     |
+                |       prox  (GET /v1/tunnel)     |
                 |                                         |
   [Client C1] <===>  Tenant Realm (access.api-keys[0])  <===> [Server S1]
   [Client C2] <===>    - Single WS connection per peer  <===> [Server S2]
@@ -42,18 +42,18 @@ CLIProxyAPI provides a built-in, multi-tenant, many-to-many **WebSocket Tunnel**
 
 ```http
 GET /v1/tunnel HTTP/1.1
-Host: <cliproxyapi-host>:<port>
+Host: <prox-host>:<port>
 Upgrade: websocket
 Connection: Upgrade
 Sec-WebSocket-Key: <base64-nonce>
 Sec-WebSocket-Version: 13
 ```
 
-Use `ws://` when TLS is disabled on CLIProxyAPI and `wss://` when `server.tls.enable: true` (or behind a TLS reverse proxy).
+Use `ws://` when TLS is disabled on prox and `wss://` when `server.tls.enable: true` (or behind a TLS reverse proxy).
 
 ### 2.2 Supplying the `access.api-keys` Credential
 
-CLIProxyAPI inspects candidate credentials in the following priority order and binds the connection to the **first non-empty candidate that matches a configured `access.api-keys` entry**:
+prox inspects candidate credentials in the following priority order and binds the connection to the **first non-empty candidate that matches a configured `access.api-keys` entry**:
 
 | Priority | Source | Example |
 | --- | --- | --- |
@@ -63,11 +63,11 @@ CLIProxyAPI inspects candidate credentials in the following priority order and b
 | 4 | URL Query `key` | `/v1/tunnel?key=sk-your-access-key&...` (recommended for browser `WebSocket` clients) |
 | 5 | URL Query `auth_token` | `/v1/tunnel?auth_token=sk-your-access-key&...` |
 
-> **Security Note**: Query parameters `key` and `auth_token` are automatically masked in CLIProxyAPI access logs, but HTTP headers (`Authorization: Bearer ...` or `X-Api-Key`) remain preferred whenever the client WebSocket SDK supports custom handshake headers.
+> **Security Note**: Query parameters `key` and `auth_token` are automatically masked in prox access logs, but HTTP headers (`Authorization: Bearer ...` or `X-Api-Key`) remain preferred whenever the client WebSocket SDK supports custom handshake headers.
 
 ### 2.3 Declaring Role, UUID, Device Name, and Server Type
 
-Each parameter is read from the **URL Query** first; if omitted or blank in the query string, CLIProxyAPI falls back to the corresponding **`X-Tunnel-*` HTTP header**:
+Each parameter is read from the **URL Query** first; if omitted or blank in the query string, prox falls back to the corresponding **`X-Tunnel-*` HTTP header**:
 
 | Parameter | Query Key | Fallback Header | Constraints |
 | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ All authentication, validation, and conflict checks run **before** upgrading the
 
 All control frames use **WebSocket Text Messages (`Opcode 0x1`)** encoded as UTF-8 JSON objects. The entire message, including unknown fields, nested values, and field names, must be valid UTF-8; invalid bytes return non-fatal `invalid_control_frame` without executing the command. Inbound control messages are limited to **4,096 bytes** (`MaxControlFrameBytes`), across all fragments, before JSON parsing. Larger controls terminate the connection with **`1009 Message Too Big`**, not an `error` frame. The inbound `type` is limited to **64 bytes** and `request_id` to **128 UTF-8 bytes**; field violations within the message-size limit return non-fatal `invalid_control_frame`. Unknown types are not echoed into error messages. Outbound server snapshots may exceed 4 KiB and are governed by the outbound budgets in §5.
 
-### 3.1 `server_list` (CLIProxyAPI → Client)
+### 3.1 `server_list` (prox → Client)
 
 Delivered **as the very first application message** when a `client` connects (if the initial snapshot cannot fit the outbound budgets, the connection instead closes with `1008` before other application messages), and also sent in response to a client's `list_servers` request. The `servers` array is always non-null (`[]` when empty) and sorted lexicographically by `uuid`.
 
@@ -137,7 +137,7 @@ Delivered **as the very first application message** when a `client` connects (if
 - `request_id` (`string`, optional): Omitted on the automatic initial push; echoed verbatim when replying to `list_servers` if the request included a non-empty `request_id`.
 - **Causal Ordering Guarantee**: The initial `server_list` snapshot is enqueued atomically under the tenant lock before the client becomes visible to subsequent broadcasts. Any `server_online` or `server_offline` event received after the initial `server_list` strictly reflects state transitions occurring after that snapshot.
 
-### 3.2 `list_servers` (Client → CLIProxyAPI)
+### 3.2 `list_servers` (Client → prox)
 
 Clients may query the latest server list at any time over the existing connection:
 
@@ -149,9 +149,9 @@ Clients may query the latest server list at any time over the existing connectio
 ```
 
 - `request_id` (`string`, optional): `0..128` UTF-8 bytes without ASCII control characters.
-- Only `client` peers may send `list_servers`. If a `server` peer sends `list_servers`, CLIProxyAPI replies with an `error` frame (`code: "unsupported_role_action"`).
+- Only `client` peers may send `list_servers`. If a `server` peer sends `list_servers`, prox replies with an `error` frame (`code: "unsupported_role_action"`).
 
-### 3.3 `server_online` & `server_offline` (CLIProxyAPI → All Online Clients in Same Tenant)
+### 3.3 `server_online` & `server_offline` (prox → All Online Clients in Same Tenant)
 
 Broadcast in real time whenever a `server` connects to or disconnects from the same `access.api-key` realm:
 
@@ -179,7 +179,7 @@ Broadcast in real time whenever a `server` connects to or disconnects from the s
 
 - Both `server_online` and `server_offline` carry `server.uuid`, `server.name`, and `server.type`.
 
-### 3.4 `error` (CLIProxyAPI → Sender Peer)
+### 3.4 `error` (prox → Sender Peer)
 
 Reports a non-fatal protocol or routing error for an individual message **within transport size limits**, without closing the multiplexed WebSocket connection. Oversized messages instead close with `1009` (see §4.3). Errors are best-effort: they may be dropped if the sender's own outbound queue or byte budget is exhausted:
 
@@ -239,11 +239,11 @@ All Client ↔ Server business packets are exchanged as **WebSocket Binary Messa
 
 1. **Client → Server Encapsulation**:
    - The client encapsulates its raw payload with `SrcUUID = <client_uuid>` and `DstUUID = <server_uuid>`.
-   - CLIProxyAPI verifies `SrcUUID == authenticated_client.uuid` and confirms `DstUUID` is an online `server` in the same `api-key` realm, then forwards the binary frame to that server.
+   - prox verifies `SrcUUID == authenticated_client.uuid` and confirms `DstUUID` is an online `server` in the same `api-key` realm, then forwards the binary frame to that server.
    - The server decapsulates the frame, obtaining the verified `client_uuid` (`SrcUUID`) and `RawPayload`.
 2. **Server → Client Encapsulation**:
    - To reply or push unsolicited data to any connected client, the server encapsulates its raw payload with `SrcUUID = <server_uuid>` and `DstUUID = <client_uuid>`.
-   - CLIProxyAPI verifies `SrcUUID == authenticated_server.uuid` and confirms `DstUUID` is an online `client` in the same `api-key` realm, then forwards the binary frame to that client.
+   - prox verifies `SrcUUID == authenticated_server.uuid` and confirms `DstUUID` is an online `client` in the same `api-key` realm, then forwards the binary frame to that client.
    - The client decapsulates the frame, obtaining the verified `server_uuid` (`SrcUUID`) and `RawPayload`.
 3. **Many-to-Many Multiplexing**:
    - A single client can interleave frames to `S1`, `S2`, ..., `Sm` on its single WebSocket connection.
@@ -272,18 +272,18 @@ Sizes refer to the reassembled WebSocket message body (the tunnel header and pay
 ## 5. Connection Lifecycle, Keepalive & Hot-Reload Behavior
 
 - **Heartbeat (Ping / Pong)**:
-  - CLIProxyAPI sends a WebSocket `Ping` control frame every **30 seconds** and imposes no artificial read/write timeouts on idle connections. Standard WebSocket libraries (browser `WebSocket`, `gorilla/websocket`, `ws`, URLSession, Tungstite) automatically reply with `Pong`. For incoming Pings, CLIProxyAPI keeps only the latest pending Pong payload (at most 125 bytes) in a bounded, non-blocking slot; its single writer sends Pongs with no write deadline. Peer-initiated Close frames use the same close state machine and single writer, replying with the received code and an empty reason without a write deadline.
+  - prox sends a WebSocket `Ping` control frame every **30 seconds** and imposes no artificial read/write timeouts on idle connections. Standard WebSocket libraries (browser `WebSocket`, `gorilla/websocket`, `ws`, URLSession, Tungstite) automatically reply with `Pong`. For incoming Pings, prox keeps only the latest pending Pong payload (at most 125 bytes) in a bounded, non-blocking slot; its single writer sends Pongs with no write deadline. Peer-initiated Close frames use the same close state machine and single writer, replying with the received code and an empty reason without a write deadline.
 - **Transport Deadline Protection**:
   - After a successful upgrade, a connection wrapper suppresses all finite `SetDeadline`, `SetReadDeadline`, and `SetWriteDeadline` calls before they reach the underlying connection. Zero deadlines still pass through. A streaming inspector checks incoming RFC 6455 headers and masked Close payloads before Gorilla receives them, retaining only a fixed-size header and at most 125 Close payload bytes, without copying data payloads. Fatal framing errors immediately unregister the peer, free its UUID, broadcast `server_offline` for a server, and start bounded local reclamation, without waiting for Gorilla’s write token or its 1-second protocol-error write timer. An already active socket write is interrupted by immediately closing the raw transport; otherwise, the single writer sends `1002`, with a 1-second local grace period if that close stalls. Interrupted peers may observe `1006`; no socket deadline is installed. Gorilla v1.5.3 rejects any pipelined bytes buffered by HTTP Hijack before sending `101`, so accepted post-upgrade input cannot bypass the inspector. Binary and text size limits use bounded reassembled-message reads rather than Gorilla’s `SetReadLimit`, so oversized messages close with `1009` through the tunnel’s single writer.
 - **Configuration Hot-Reload (`access.api-keys` Revocation)**:
-  - When `config.yaml` is reloaded or updated via Management API v8, if an `access.api-key` is removed, CLIProxyAPI immediately unregisters all client and server connections under that key and requests WebSocket Close **`1008` (`ClosePolicyViolation`, `"api key revoked"`)** asynchronously. The single writer finishes any active healthy write, prioritizes the close frame, discards remaining queued frames, and closes the socket. Connections under unchanged keys continue uninterrupted.
+  - When `config.yaml` is reloaded or updated via Management API v8, if an `access.api-key` is removed, prox immediately unregisters all client and server connections under that key and requests WebSocket Close **`1008` (`ClosePolicyViolation`, `"api key revoked"`)** asynchronously. The single writer finishes any active healthy write, prioritizes the close frame, discards remaining queued frames, and closes the socket. Connections under unchanged keys continue uninterrupted.
   - Revocation also immediately invalidates and clears all pending UUID reservations. Re-adding the same key allows a fresh connection with the same UUID immediately. Any pre-revocation handshake that later finishes upgrading still receives `1008` (`"api key revoked"`); its commit or failed-upgrade cleanup cannot remove a newer reservation or replace the new connection.
 - **Server Shutdown**:
-  - When CLIProxyAPI stops, it immediately unregisters active tunnel connections and asynchronously requests WebSocket Close **`1001` (`CloseGoingAway`, `"server shutting down"`)** using the same close state machine.
+  - When prox stops, it immediately unregisters active tunnel connections and asynchronously requests WebSocket Close **`1001` (`CloseGoingAway`, `"server shutting down"`)** using the same close state machine.
   - Revocation and shutdown never wait for socket writes. A **1-second local close grace period** forces socket reclamation if the close/active write stalls; this installs no read/write deadlines and does not limit active connections. Healthy readers receive the requested close code even with queued/active writes; genuinely stalled peers may observe abnormal closure (`1006`) instead. This fallback cannot delay revocation or shutdown of other peers.
 - **Slow-Consumer Protection**:
-  - Each connection has an isolated 256-frame outbound queue. **All outbound JSON control and binary data bytes, including in-flight writes**, count toward a **per-peer budget of `64 MiB + 512` bytes** and a **per-API-key tenant budget of `256 MiB`**. The API server constructs its internal Hub with these built-in defaults. `internal/wstunnel.Options` (`SendQueueSize`, `MaxPeerQueuedBytes`, `MaxTenantQueuedBytes`) is only for internal Hub construction within CLIProxyAPI; it is not importable or configurable by external SDK consumers, nor exposed as YAML settings. For internal construction only, an unspecified tenant limit defaults to the larger of 256 MiB and the per-peer limit. There is no shared cross-tenant budget. Reservations are released after writing or discarding frames. In-flight write bytes remain charged to the API key's `256 MiB` tenant budget across disconnects and reconnects until the underlying socket write drains or is reclaimed.
-  - Per-peer exhaustion rejects only that target, so healthy peers in the same tenant continue exchanging while tenant budget remains available. Tenant-wide exhaustion rejects further enqueues only within that tenant; other tenants remain unaffected. Rejected data sends produce `{"type":"error","code":"target_buffer_full","target_uuid":"..."}` when the sender has room for the error. If an initial/queried `server_list` or a topology broadcast cannot fit its recipient's frame/byte budgets, CLIProxyAPI requests `1008` (`"control queue overflow"`), forcing resynchronization after reconnect rather than silently losing topology state.
+  - Each connection has an isolated 256-frame outbound queue. **All outbound JSON control and binary data bytes, including in-flight writes**, count toward a **per-peer budget of `64 MiB + 512` bytes** and a **per-API-key tenant budget of `256 MiB`**. The API server constructs its internal Hub with these built-in defaults. `internal/wstunnel.Options` (`SendQueueSize`, `MaxPeerQueuedBytes`, `MaxTenantQueuedBytes`) is only for internal Hub construction within prox; it is not importable or configurable by external SDK consumers, nor exposed as YAML settings. For internal construction only, an unspecified tenant limit defaults to the larger of 256 MiB and the per-peer limit. There is no shared cross-tenant budget. Reservations are released after writing or discarding frames. In-flight write bytes remain charged to the API key's `256 MiB` tenant budget across disconnects and reconnects until the underlying socket write drains or is reclaimed.
+  - Per-peer exhaustion rejects only that target, so healthy peers in the same tenant continue exchanging while tenant budget remains available. Tenant-wide exhaustion rejects further enqueues only within that tenant; other tenants remain unaffected. Rejected data sends produce `{"type":"error","code":"target_buffer_full","target_uuid":"..."}` when the sender has room for the error. If an initial/queried `server_list` or a topology broadcast cannot fit its recipient's frame/byte budgets, prox requests `1008` (`"control queue overflow"`), forcing resynchronization after reconnect rather than silently losing topology state.
 
 ### Recommended Client State Machine
 
@@ -502,7 +502,7 @@ func RunEchoTunnelServer(proxyWSBaseURL, apiKey, serverUUID, serverName, serverT
 			return errRead
 		}
 		if msgType == websocket.TextMessage {
-			// Non-fatal control/error notifications from CLIProxyAPI
+			// Non-fatal control/error notifications from prox
 			fmt.Printf("control frame: %s\n", string(raw))
 			continue
 		}

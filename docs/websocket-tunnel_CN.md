@@ -1,6 +1,6 @@
 # WebSocket Tunnel 客户端与服务端对接技术文档
 
-CLIProxyAPI 内置支持多租户隔离、多对多全双工复用的 **WebSocket Tunnel**（`GET /v1/tunnel`），用于在已认证的**客户端（Client）**与**服务端（Server）**设备之间透明交换任意数据包。CLIProxyAPI 自身不解析、不修改任何业务载荷内容，仅负责基于 `access.api-keys` 的租户隔离、在线设备发现、源身份防伪造校验以及高速数据包路由转发。
+prox 内置支持多租户隔离、多对多全双工复用的 **WebSocket Tunnel**（`GET /v1/tunnel`），用于在已认证的**客户端（Client）**与**服务端（Server）**设备之间透明交换任意数据包。prox 自身不解析、不修改任何业务载荷内容，仅负责基于 `access.api-keys` 的租户隔离、在线设备发现、源身份防伪造校验以及高速数据包路由转发。
 
 ---
 
@@ -8,7 +8,7 @@ CLIProxyAPI 内置支持多租户隔离、多对多全双工复用的 **WebSocke
 
 ```text
                 +-----------------------------------------+
-                |       CLIProxyAPI  (GET /v1/tunnel)     |
+                |       prox  (GET /v1/tunnel)     |
                 |                                         |
   [Client C1] <===>  租户隔离域 (access.api-keys[0])    <===> [Server S1]
   [Client C2] <===>    - 单设备仅维持 1 条 WS 连接      <===> [Server S2]
@@ -42,7 +42,7 @@ CLIProxyAPI 内置支持多租户隔离、多对多全双工复用的 **WebSocke
 
 ```http
 GET /v1/tunnel HTTP/1.1
-Host: <cliproxyapi-host>:<port>
+Host: <prox-host>:<port>
 Upgrade: websocket
 Connection: Upgrade
 Sec-WebSocket-Key: <base64-nonce>
@@ -53,7 +53,7 @@ Sec-WebSocket-Version: 13
 
 ### 2.2 `access.api-keys` 凭证传递方式
 
-CLIProxyAPI 按以下优先级顺序提取候选凭证，并将连接绑定到**第一个非空且命中 `access.api-keys` 配置项的密钥**：
+prox 按以下优先级顺序提取候选凭证，并将连接绑定到**第一个非空且命中 `access.api-keys` 配置项的密钥**：
 
 | 优先级 | 凭证来源 | 示例 |
 | --- | --- | --- |
@@ -63,7 +63,7 @@ CLIProxyAPI 按以下优先级顺序提取候选凭证，并将连接绑定到**
 | 4 | URL Query 参数 `key` | `/v1/tunnel?key=sk-your-access-key&...`（适合浏览器原生 `WebSocket` API） |
 | 5 | URL Query 参数 `auth_token` | `/v1/tunnel?auth_token=sk-your-access-key&...` |
 
-> **安全说明**：CLIProxyAPI 访问日志已自动对 Query 中的 `key` 与 `auth_token` 脱敏，但在支持自定义握手请求头的 SDK 中仍优先推荐使用 `Authorization: Bearer ...` 或 `X-Api-Key` 请求头。
+> **安全说明**：prox 访问日志已自动对 Query 中的 `key` 与 `auth_token` 脱敏，但在支持自定义握手请求头的 SDK 中仍优先推荐使用 `Authorization: Bearer ...` 或 `X-Api-Key` 请求头。
 
 ### 2.3 角色与设备身份声明参数
 
@@ -110,7 +110,7 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 
 控制通道统一使用 **WebSocket 文本帧（`Opcode 0x1`）**，内容为 UTF-8 编码的 JSON 对象。整条消息（包括未知字段、嵌套值和字段名）都必须是合法 UTF-8；存在非法字节时返回非致命 `invalid_control_frame`，不执行命令。入站控制消息在解析 JSON 前按所有分片合计限制为 **4,096 字节**（`MaxControlFrameBytes`）；超过时以 **`1009 Message Too Big`** 终止连接，不返回 `error` 帧。入站 `type` 最多 **64 字节**，`request_id` 最多 **128 字节 UTF-8**；在消息总长度限制内违反字段限制时返回非致命 `invalid_control_frame`。未知类型不会被回显到错误消息。出站服务端列表可以超过 4 KiB，但受 §5 的发送字节预算约束。
 
-### 3.1 `server_list`：全量在线服务端列表（CLIProxyAPI → Client）
+### 3.1 `server_list`：全量在线服务端列表（prox → Client）
 
 客户端首次握手注册成功后**收到的第 1 条应用消息为 `server_list`**（若首连列表无法计入发送预算，则改为以 `1008` 关闭，不先发送其他应用消息）；此外客户端主动发送 `list_servers` 查询时也会返回该消息。`servers` 始终为数组（无在线服务端时为 `[]`），按 `uuid` 字典序升序排列。
 
@@ -137,7 +137,7 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 - `request_id`（可选字符串）：首连自动推送时不包含此字段；响应 `list_servers` 查询且请求带有非空 `request_id` 时原样回显。
 - **因果顺序保证**：首连 `server_list` 快照在租户写锁内生成并率先写入客户端发送队列槽位 `0` 后，该客户端才对后续广播可见，因此后续收到的任何 `server_online` / `server_offline` 均严格发生在首连快照之后，不会乱序。
 
-### 3.2 `list_servers`：主动查询在线服务端列表（Client → CLIProxyAPI）
+### 3.2 `list_servers`：主动查询在线服务端列表（Client → prox）
 
 客户端可在连接存续期间随时发送该消息主动刷新列表：
 
@@ -151,9 +151,9 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 - `request_id`（可选字符串）：`0..128` 字节 UTF-8 字符串，不含 ASCII 控制字符。
 - 仅限 `client` 角色调用；若 `server` 角色发送该消息，将收到 `error` 控制帧（`code: "unsupported_role_action"`）。
 
-### 3.3 `server_online` 与 `server_offline`：服务端上下线实时推送（CLIProxyAPI → 同租户所有在线 Client）
+### 3.3 `server_online` 与 `server_offline`：服务端上下线实时推送（prox → 同租户所有在线 Client）
 
-当同一 `access.api-key` 下有服务端新接入或断开时，CLIProxyAPI 实时向该密钥下所有在线客户端推送增量通知：
+当同一 `access.api-key` 下有服务端新接入或断开时，prox 实时向该密钥下所有在线客户端推送增量通知：
 
 ```json
 {
@@ -179,9 +179,9 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 
 - `server_online` 与 `server_offline` 均携带完整的 `server.uuid`、`server.name` 与 `server.type` 字段。
 
-### 3.4 `error`：非致命控制与路由错误通知（CLIProxyAPI → 发送方 Peer）
+### 3.4 `error`：非致命控制与路由错误通知（prox → 发送方 Peer）
 
-消息**未超过传输层大小限制**但格式有误或目标不可达时，CLIProxyAPI 向发送方返回 `error` 文本帧，不会断开当前复用的 WebSocket 长连接。超大消息改为以 `1009` 关闭（见 §4.3）。错误通知为尽力投递；发送方自己的队列或字节预算耗尽时可能丢弃：
+消息**未超过传输层大小限制**但格式有误或目标不可达时，prox 向发送方返回 `error` 文本帧，不会断开当前复用的 WebSocket 长连接。超大消息改为以 `1009` 关闭（见 §4.3）。错误通知为尽力投递；发送方自己的队列或字节预算耗尽时可能丢弃：
 
 ```json
 {
@@ -228,7 +228,7 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 | 字节偏移 | 字段名 | 类型 | 说明 |
 | --- | --- | --- | --- |
 | `0` | `Version` | `uint8` | 协议版本号，固定为 `0x01`。 |
-| `1` | `PayloadType` | `uint8` | 应用层载荷类型提示（`0x00` = 二进制，`0x01` = UTF-8 文本，`0x02..0xFF` = 业务自定义扩展子类型）。CLIProxyAPI 原样透传该字节，不校验载荷内容。 |
+| `1` | `PayloadType` | `uint8` | 应用层载荷类型提示（`0x00` = 二进制，`0x01` = UTF-8 文本，`0x02..0xFF` = 业务自定义扩展子类型）。prox 原样透传该字节，不校验载荷内容。 |
 | `2` | `SrcUUIDLen` | `uint8` | 发送方 `SrcUUID` 的字节长度（合法范围 `1..128`）。 |
 | `3` | `DstUUIDLen` | `uint8` | 接收方 `DstUUID` 的字节长度（合法范围 `1..128`）。 |
 | `4 .. 4+SrcUUIDLen-1` | `SrcUUID` | ASCII | **客户端 → 服务端**：填入客户端自身 `client_uuid`。<br>**服务端 → 客户端**：填入服务端自身 `server_uuid`。 |
@@ -239,11 +239,11 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 
 1. **客户端 → 服务端方向**：
    - 客户端在发送原始业务数据包时，封装 `SrcUUID = <client_uuid>`、`DstUUID = <server_uuid>`；
-   - CLIProxyAPI 校验 `SrcUUID` 必须等于当前客户端连接认证的 `uuid`，并在同一 `api-key` 租户域内确认 `DstUUID` 为在线 `server`，随后直接将该二进制帧原样转发至目标服务端连接；
+   - prox 校验 `SrcUUID` 必须等于当前客户端连接认证的 `uuid`，并在同一 `api-key` 租户域内确认 `DstUUID` 为在线 `server`，随后直接将该二进制帧原样转发至目标服务端连接；
    - 服务端解封装后即可拿到可信的来源客户端 `client_uuid`（`SrcUUID`）与原始数据包 `RawPayload`。
 2. **服务端 → 客户端方向**：
    - 服务端无论是响应请求还是主动向客户端推送流式数据，均封装 `SrcUUID = <server_uuid>`、`DstUUID = <client_uuid>`；
-   - CLIProxyAPI 校验 `SrcUUID` 等于当前服务端连接认证的 `uuid`，并在同一 `api-key` 租户域内确认 `DstUUID` 为在线 `client`，随后直接将该二进制帧转发至目标客户端连接；
+   - prox 校验 `SrcUUID` 等于当前服务端连接认证的 `uuid`，并在同一 `api-key` 租户域内确认 `DstUUID` 为在线 `client`，随后直接将该二进制帧转发至目标客户端连接；
    - 客户端解封装后即可拿到可信的来源服务端 `server_uuid`（`SrcUUID`）与原始数据包 `RawPayload`。
 3. **多对多单连接复用**：
    - 任意客户端可在同一条 WebSocket 连接上并发向多个服务端（`S1`, `S2`, ..., `Sm`）交错收发数据包；
@@ -272,17 +272,17 @@ wss://proxy.example.com/v1/tunnel?role=server&uuid=6ba7b810-9dad-11d1-80b4-00c04
 ## 5. 连接生命周期、保活与热重载行为
 
 - **Ping / Pong 心跳保活**：
-  - CLIProxyAPI 默认每 **30 秒** 向在线连接发送一次标准 WebSocket `Ping` 控制帧，且不对空闲长连接施加人为读写超时中断。主流 WebSocket 客户端库均会自动回复 `Pong`。对于收到的 Ping，CLIProxyAPI 使用有界、非阻塞的单槽位，仅保留最新待发送的 Pong 载荷（最多 125 字节），交由单写协程在无写 deadline 的情况下应答。对端主动发送的 Close 帧也通过相同关闭状态机与单写协程处理，以收到的关闭码和空原因应答，不设置写 deadline。
+  - prox 默认每 **30 秒** 向在线连接发送一次标准 WebSocket `Ping` 控制帧，且不对空闲长连接施加人为读写超时中断。主流 WebSocket 客户端库均会自动回复 `Pong`。对于收到的 Ping，prox 使用有界、非阻塞的单槽位，仅保留最新待发送的 Pong 载荷（最多 125 字节），交由单写协程在无写 deadline 的情况下应答。对端主动发送的 Close 帧也通过相同关闭状态机与单写协程处理，以收到的关闭码和空原因应答，不设置写 deadline。
 - **传输层 deadline 防护**：
   - 升级成功后，连接包装器会拦截所有有限 `SetDeadline`、`SetReadDeadline` 与 `SetWriteDeadline`，确保它们不会传递到底层连接；空 deadline 仍正常透传。流式检查器在 Gorilla 收到字节前校验入站 RFC 6455 帧头与掩码 Close 载荷，仅保留定长帧头和最多 125 字节的 Close 载荷，不复制数据载荷。致命帧错误立即注销设备、释放 UUID、为服务端广播 `server_offline` 并启动有界本地回收，不等待 Gorilla 写令牌或其 1 秒协议错误写入计时器。若套接字写入已经活跃，则立即关闭原始传输以中断写入；否则交由单写协程发送 `1002`，仅在该关闭写入停滞时使用 1 秒本地回收宽限期。被中断的对端可能看到 `1006`，整个流程不设置套接字 deadline。Gorilla v1.5.3 在发送 `101` 前拒绝 HTTP Hijack 缓冲区中的所有提前数据，因此已接受的升级后入站字节不会绕过检查器。二进制与文本大小限制采用重组消息的有界读取，而非 Gorilla 的 `SetReadLimit`，因此超限消息统一交由隧道单写协程以 `1009` 关闭。
 - **配置热重载与密钥吊销（`1008 Policy Violation`）**：
-  - 当管理员修改 `config.yaml` 或通过 Management API v8 更新 `access.api-keys` 时，若某个正在使用的 `api-key` 被删除，CLIProxyAPI 会立即注销该密钥下的所有客户端与服务端，并异步请求 WebSocket Close **`1008`（`"api key revoked"`）**；单写协程完成正在进行的健康写入后优先发送关闭帧，丢弃其余排队帧并回收套接字；其他未变更密钥下的活跃连接完全不受影响。
+  - 当管理员修改 `config.yaml` 或通过 Management API v8 更新 `access.api-keys` 时，若某个正在使用的 `api-key` 被删除，prox 会立即注销该密钥下的所有客户端与服务端，并异步请求 WebSocket Close **`1008`（`"api key revoked"`）**；单写协程完成正在进行的健康写入后优先发送关闭帧，丢弃其余排队帧并回收套接字；其他未变更密钥下的活跃连接完全不受影响。
   - 吊销还会立即清除并使该密钥下所有待完成握手的 UUID 预约失效。重新添加相同密钥后，可立即使用相同 UUID 建立新连接；吊销前的旧握手即使随后升级成功，仍收到 `1008`（`"api key revoked"`），其提交或升级失败清理不会删除新的预约或覆盖新连接。
 - **服务停机通知（`1001 Going Away`）**：
-  - 当 CLIProxyAPI 停机时，立即注销所有在线连接，并通过相同关闭状态机异步请求 WebSocket Close **`1001`（`"server shutting down"`）**。
+  - 当 prox 停机时，立即注销所有在线连接，并通过相同关闭状态机异步请求 WebSocket Close **`1001`（`"server shutting down"`）**。
   - 吊销与停机调用均不等待网络写入。关闭/当前写入阻塞时，**1 秒本地关闭宽限期**结束后强制回收套接字；该机制不设置读写 deadline，也不限制正常活跃连接。健康接收方即使有排队/正在写入的帧仍会收到指定关闭码；真正停滞的对端可能只能看到异常关闭（`1006`），但不能拖延其他连接的吊销或停机。
 - **慢消费者背压隔离**：
-  - 每个连接拥有独立的 256 帧发送队列。**所有出站 JSON 控制与二进制数据字节（包括正在写入的帧）**共同计入 **单连接 `64 MiB + 512` 字节**与**每个 API Key 租户 `256 MiB`**预算。API 服务使用这些内置默认值构建内部 Hub。`internal/wstunnel.Options`（`SendQueueSize`、`MaxPeerQueuedBytes`、`MaxTenantQueuedBytes`）仅供 CLIProxyAPI 内部构建 Hub 使用，外部 SDK 消费者无法导入或配置，也不暴露为 YAML 配置项。仅在内部构建时，未指定租户预算才取 256 MiB 与单连接预算的较大值。不存在跨租户共享预算，写入完成或帧被丢弃时归还预算。断连与重连期间，正在写入的字节仍计入同一 API Key 的 `256 MiB` 租户预算，直到底层套接字写入完成或套接字被回收。
+  - 每个连接拥有独立的 256 帧发送队列。**所有出站 JSON 控制与二进制数据字节（包括正在写入的帧）**共同计入 **单连接 `64 MiB + 512` 字节**与**每个 API Key 租户 `256 MiB`**预算。API 服务使用这些内置默认值构建内部 Hub。`internal/wstunnel.Options`（`SendQueueSize`、`MaxPeerQueuedBytes`、`MaxTenantQueuedBytes`）仅供 prox 内部构建 Hub 使用，外部 SDK 消费者无法导入或配置，也不暴露为 YAML 配置项。仅在内部构建时，未指定租户预算才取 256 MiB 与单连接预算的较大值。不存在跨租户共享预算，写入完成或帧被丢弃时归还预算。断连与重连期间，正在写入的字节仍计入同一 API Key 的 `256 MiB` 租户预算，直到底层套接字写入完成或套接字被回收。
   - 单连接预算耗尽仅拒绝该目标；同租户仍有总预算时，其他健康节点继续交换。租户预算耗尽仅影响该租户的后续入队，其他租户不受影响。数据入队失败时，仅在发送方自身还有空间时投递 `target_buffer_full`。首连/主动查询 `server_list` 或拓扑广播无法计入接收方帧/字节预算时，请求 `1008`（`"control queue overflow"`）关闭，促使重连重建列表，避免静默失步。
 
 ### 客户端推荐对接状态机
@@ -501,7 +501,7 @@ func RunEchoTunnelServer(proxyWSBaseURL, apiKey, serverUUID, serverName, serverT
 			return errRead
 		}
 		if msgType == websocket.TextMessage {
-			// Non-fatal control or error notification from CLIProxyAPI
+			// Non-fatal control or error notification from prox
 			fmt.Printf("control frame: %s\n", string(raw))
 			continue
 		}

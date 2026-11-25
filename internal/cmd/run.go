@@ -1,4 +1,4 @@
-// Package cmd provides command-line interface functionality for the CLI Proxy API server.
+// Package cmd provides command-line interface functionality for the prox server.
 // It includes authentication flows for various AI service providers, service startup,
 // and other command-line operations.
 package cmd

@@ -165,7 +165,7 @@ func GetXAIReasoningReplayItemsRequired(ctx context.Context, modelName, sessionK
 		}
 		homeItems, errUnmarshal := unmarshalReasoningReplayRawJSONArray(raw)
 		if errUnmarshal != nil {
-			log.Warnf("xai reasoning replay KV decode failed (please upgrade CLIProxyAPI): %v", errUnmarshal)
+			log.Warnf("xai reasoning replay KV decode failed (please upgrade prox): %v", errUnmarshal)
 			return nil, false, errUnmarshal
 		}
 		if _, errExpire := client.KVExpire(ctx, xaiReasoningReplayKVKey(modelName, sessionKey), XAIReasoningReplayCacheTTL); errExpire != nil {

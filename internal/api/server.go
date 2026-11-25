@@ -1,4 +1,4 @@
-// Package api provides the HTTP API server implementation for the CLI Proxy API.
+// Package api provides the HTTP API server implementation for prox.
 // It includes the main server struct, routing setup, middleware for CORS and authentication,
 // and integration with various AI API handlers (OpenAI, Claude, Gemini).
 // The server supports hot-reloading of clients and configuration.

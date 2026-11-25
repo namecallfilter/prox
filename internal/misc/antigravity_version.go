@@ -1,4 +1,4 @@
-// Package misc provides miscellaneous utility functions for the CLI Proxy API server.
+// Package misc provides miscellaneous utility functions for the prox server.
 package misc
 
 import (
