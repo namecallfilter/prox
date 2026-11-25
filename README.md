@@ -50,7 +50,11 @@ plugins:
     cliproxy-antigravity:
       enabled: true
       binary_path: "agy"
+      accounts_dir: "~/.agy-accounts" # one agy home per Google account
+      auth_dir: "~/.prox"             # the plugin assumes ~/.cli-proxy-api unless told
 ```
+
+Without `auth_dir` the plugin looks for upstream's default auth directory, finds nothing, and silently imports no accounts.
 
 ## Documentation
 
